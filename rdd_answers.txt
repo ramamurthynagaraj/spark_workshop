@@ -1,0 +1,54 @@
+RDD Answers:
+val medals_with_header = sc.textFile("olympics.csv")
+val continents_with_header = sc.textFile("continents.csv")
+
+1. Find number of rows except header
+val header = medals_with_header.first
+medals_with_header.filter(!_.contains(header)).count
+
+val medals = medals_with_header.filter(!_.contains(header)).map(_.split(","))
+
+2. Find the country with maximum number of medals.
+medals.map(m => (m(1), m(7).toInt)).reduceByKey(_+_).sortBy(v => v._2, false).first
+
+case class Player(name: String,
+ country: String,
+ year: Int,
+ sport: String,
+ gold: Int,
+ silver: Int,
+ bronze: Int,
+ total: Int)
+
+val data = sc.textFile("../olympics.csv")
+val header = data.first
+val players = data.filter(x => x != header).map(x => {
+ val row = x.split(",")
+ Player(row(0), row(1),row(2).toInt,row(3),row(4).toInt, row(5).toInt, row(6).toInt,row(7).toInt)
+})
+
+players.map(p => (p.country, p.total)).reduceByKey(_ + _).sortBy(v => v._2, false).first
+
+3. In year 2012, find the country with maximum number of medals.
+medals.filter(_(2) == "2012").map(m => (m(1), m(7).toInt)).reduceByKey(_+_).sortBy(v => v._2, false).first
+players.filter(_.year == 2012).map(p => (p.country, p.total)).reduceByKey(_ + _).sortBy(v => v._2, false).first
+
+4. List out athlete with max gold medals for each year.
+//medals.map(m => ((m(2), m(0)), m(4).toInt)).reduceByKey(_+_).sortBy(v => v._2, false).first
+//val year_athlete_count = medals.map(m => ((m(2), m(0)), m(4).toInt)).reduceByKey(_+_)
+//year_athlete_count.map(v => (v._1._1, (v._1._2, v._2))).reduceByKey(getTopAthlete).collect
+
+
+def getTopAthlete(v: (String, Int), w: (String, Int)) = {
+	if(v._2 > w._2) v else w
+}
+medals.map(m => (m(2), (m(0), m(4).toInt))).reduceByKey(getTopAthlete).collect
+players.map(p => (p.year, (p.name, p.gold))).reduceByKey(getTopAthlete).collect
+
+5. In the year 2012, compute the continents share of medals
+val continents_header = continents_with_header.first
+val continents = continents_with_header.filter(!_.contains(continents_header)).map(_.split(","))
+val medals_2012 = medals.filter(_(2) == "2012")
+medals_2012.keyBy(_(1)).join(continents.keyBy(_(0)))
+	.map(v => (v._2._2(1), v._2._1(7).toInt)).reduceByKey(_ + _).collect
+
