@@ -1,0 +1,6 @@
+Questions:
+1. Find number of rows except header
+2. Find the country with overall maximum number of medals.
+3. In year 2012, find the country with maximum number of medals.
+4. List out athlete with max gold for each year.
+5. In the year 2012, compute the continents share of medals
