@@ -1,0 +1,66 @@
+Creating Dataframe
+==================
+val medals_with_header = sc.textFile("../olympics.csv")
+case class Player(name: String,
+ country: String,
+ year: Int,
+ sport: String,
+ gold: Int,
+ silver: Int,
+ bronze: Int,
+ total: Int)
+
+val header = medals_with_header.first
+val players = medals_with_header.filter(x => x != header).map(x => {
+ val row = x.split(",")
+ Player(row(0), row(1),row(2).toInt,row(3),row(4).toInt, row(5).toInt, row(6).toInt,row(7).toInt)
+}).toDF
+
+
+DataFrame API
+==============
+1. Find number of rows except header
+players.count
+
+2. Find the country with maximum number of medals.
+players.groupBy(players("country")).agg(sum(players("total")) as "all_total").sort(desc("all_total")).first
+
+3. In year 2012, find the country with maximum number of medals.
+players.filter("year=2012").groupBy(players("country")).agg(sum(players("total")) as "all_total").sort(desc("all_total")).first
+
+4. List out athlete with max gold medals for each year.
+import org.apache.spark.sql.expressions.Window
+val window_func = Window.partitionBy("year").orderBy(desc("gold"))
+players.withColumn("topper", rowNumber.over(window_func)).filter("topper=1").select(players("name"), players("gold"), players("year")).collect
+
+5. In the year 2012, compute the continents share of medals
+val continents_with_header = sc.textFile("../continents.csv")
+val continents_header = continents_with_header.first
+case class Continent(country: String, continent: String)
+val continents = continents_with_header.filter(!_.contains(continents_header)).map( x => {
+	val row = x.split(",")
+	Continent(row(0), row(1))
+}).toDF
+
+players.filter("year=2012").join(continents, players("country") === continents("country")).groupBy(continents("continent")).agg(sum(players("total")) as "continents_total").collect
+
+
+Sql - API
+==========
+1. Find number of rows except header
+players.registerTempTable("temp_players")
+sqlContext.sql("select count(*) from temp_players").first
+
+2. Find the country with maximum number of medals.
+sqlContext.sql("select country, sum(total) as sum_total from temp_players group by country order by sum_total desc").first
+
+3. In year 2012, find the country with maximum number of medals.
+sqlContext.sql("select country, sum(total) as sum_total from temp_players where year=2012 group by country order by sum_total desc").first
+
+4. List out athlete with max gold medals for each year.
+sqlContext.sql("select name, gold, year, row_number() over (partition by year order by gold desc) as topper from temp_players").registerTempTable("temp_players_with_rank")
+
+sqlContext.sql("select name, gold, year from temp_players_with_rank where topper = 1").collect
+
+5. In the year 2012, compute the continents share of medals
+sqlContext.sql("select tc.continent, sum(tp.total) as continent_total from temp_players tp join temp_continents tc on tp.country = tc.country where tp.year=2012 group by tc.continent").collect
